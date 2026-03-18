@@ -49,16 +49,17 @@ CREATE OR REPLACE PACKAGE util AS
 -------------------------        
 
 	-- PS-10         
-    PROCEDURE add_employee(p_first_name     IN VARCHAR2,
-                        p_last_name      IN VARCHAR2,
-                        p_email          IN VARCHAR2,
-                        p_phone_number   IN VARCHAR2,
-                        p_hire_date      IN DATE DEFAULT TRUNC(SYSDATE, 'dd'),
-                        p_job_id         IN VARCHAR2,
-                        p_salary         IN NUMBER,
-                        p_commission_pct IN VARCHAR2 DEFAULT NULL,
-                        p_manager_id     IN NUMBER DEFAULT 100,
-                        p_department_id  IN VARCHAR2);        
+    PROCEDURE add_employee(
+                        p_first_name     IN employees.first_name%TYPE,
+                        p_last_name      IN employees.last_name%TYPE,
+                        p_email          IN employees.email%TYPE,
+                        p_phone_number   IN employees.phone_number%TYPE,
+                        p_hire_date      IN employees.hire_date%TYPE DEFAULT TRUNC(SYSDATE, 'dd'),
+                        p_job_id         IN employees.job_id%TYPE,
+                        p_salary         IN employees.salary%TYPE,
+                        p_commission_pct IN employees.commission_pct%TYPE DEFAULT NULL,
+                        p_manager_id     IN employees.manager_id%TYPE DEFAULT 100,
+                        p_department_id  IN employees.department_id%TYPE);        
 
 
  END util;  
@@ -295,16 +296,16 @@ END table_from_list;
     
  ------------------------------------
 	---- PS - 10
-    PROCEDURE add_employee(p_first_name     IN VARCHAR2,
-                          p_last_name      IN VARCHAR2,
-                          p_email          IN VARCHAR2,
-                          p_phone_number   IN VARCHAR2,
-                          p_hire_date      IN DATE DEFAULT TRUNC(SYSDATE, 'dd'),
-                          p_job_id         IN VARCHAR2,
-                          p_salary         IN NUMBER,
-                          p_commission_pct IN VARCHAR2 DEFAULT NULL,
-                          p_manager_id     IN NUMBER DEFAULT 100,
-                          p_department_id  IN VARCHAR2
+    PROCEDURE add_employee(p_first_name     IN employees.first_name%TYPE,
+                        p_last_name      IN employees.last_name%TYPE,
+                        p_email          IN employees.email%TYPE,
+                        p_phone_number   IN employees.phone_number%TYPE,
+                        p_hire_date      IN employees.hire_date%TYPE DEFAULT TRUNC(SYSDATE, 'dd'),
+                        p_job_id         IN employees.job_id%TYPE,
+                        p_salary         IN employees.salary%TYPE,
+                        p_commission_pct IN employees.commission_pct%TYPE DEFAULT NULL,
+                        p_manager_id     IN employees.manager_id%TYPE DEFAULT 100,
+                        p_department_id  IN employees.department_id%TYPE
                           ) IS
         v_min_sal NUMBER;
         v_max_sal NUMBER;
