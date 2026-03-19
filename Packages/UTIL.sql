@@ -60,7 +60,10 @@ CREATE OR REPLACE PACKAGE util AS
                         p_commission_pct IN employees.commission_pct%TYPE DEFAULT NULL,
                         p_manager_id     IN employees.manager_id%TYPE DEFAULT 100,
                         p_department_id  IN employees.department_id%TYPE);        
+-------------------------
 
+    -- PS-11  
+    PROCEDURE fire_an_employee(p_employee_id IN employees.employee_id%TYPE);
 
  END util;  
 
@@ -361,6 +364,57 @@ END table_from_list;
 
         log_utils.log_finish('add_employee', v_message);
     END add_employee;
+    
+    
+-------------------------
+    
+    PS - 11
+    
+    PROCEDURE fire_an_employee(p_employee_id IN employees.employee_id%TYPE) IS
+        v_first_name    VARCHAR2(50);
+        v_last_name     VARCHAR2(50);
+        v_job_id        VARCHAR2(20);
+        v_department_id NUMBER;
+    BEGIN
+        log_utils.log_start('fire_an_employee', 'Видалення співробітника ID: ' || p_employee_id);
+
+        IF TO_CHAR(SYSDATE, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') OR
+           TO_CHAR(SYSDATE, 'HH24:MI') > '18:00' OR 
+           TO_CHAR(SYSDATE, 'HH24:MI') < '08:00' THEN
+            raise_application_error(-20001, 'Ви можете видаляти співробітника лише в робочий час');
+        END IF;
+
+        BEGIN
+            SELECT first_name, last_name, job_id, department_id
+            INTO   v_first_name, v_last_name, v_job_id, v_department_id
+            FROM   employees
+            WHERE  employee_id = p_employee_id;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                raise_application_error(-20001, 'Переданий співробітник не існує');
+        END;
+
+        BEGIN
+            -- Записуємо в таблицю історії
+            INSERT INTO employees_history (employee_id, first_name, last_name, job_id, department_id)
+            VALUES (p_employee_id, v_first_name, v_last_name, v_job_id, v_department_id);
+
+            -- видаляємо з основної таблиці
+            DELETE FROM employees WHERE employee_id = p_employee_id;
+            
+            DBMS_OUTPUT.PUT_LINE('Співробітник ' || v_first_name || ', ' || v_last_name || 
+                                 ', ' || v_job_id || ', ' || v_department_id || ' успішно видалений');
+                                 
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- логуємо помилку
+                log_utils.log_error('fire_an_employee', SQLERRM);
+                RAISE;
+        END;
+
+        log_utils.log_finish('fire_an_employee');
+    END fire_an_employee;
+    
     
 END util;
             
