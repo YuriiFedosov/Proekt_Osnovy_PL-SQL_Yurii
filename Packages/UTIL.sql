@@ -65,6 +65,20 @@ CREATE OR REPLACE PACKAGE util AS
     -- PS-11  
     PROCEDURE fire_an_employee(p_employee_id IN employees.employee_id%TYPE);
 
+-------------------------
+     -- PS-12
+    PROCEDURE change_attribute_employee(p_employee_id    IN employees.employee_id%TYPE,
+                                      p_first_name     IN employees.first_name%TYPE DEFAULT NULL,
+                                      p_last_name      IN employees.last_name%TYPE DEFAULT NULL,
+                                      p_email          IN employees.email%TYPE DEFAULT NULL,
+                                      p_phone_number   IN employees.phone_number%TYPE DEFAULT NULL,
+                                      p_job_id         IN employees.job_id%TYPE DEFAULT NULL,
+                                      p_salary         IN employees.salary%TYPE   DEFAULT NULL,
+                                      p_commission_pct IN employees.commission_pct%TYPE   DEFAULT NULL,
+                                      p_manager_id     IN employees.manager_id%TYPE   DEFAULT NULL,
+                                      p_department_id  IN employees.department_id%TYPE   DEFAULT NULL
+                                  );
+
  END util;  
 
 
@@ -414,6 +428,70 @@ END table_from_list;
 
         log_utils.log_finish('fire_an_employee');
     END fire_an_employee;
+    
+---------------------------
+        --- PS-12
+        PROCEDURE change_attribute_employee(p_employee_id    IN employees.employee_id%TYPE,
+                                      p_first_name     IN employees.first_name%TYPE DEFAULT NULL,
+                                      p_last_name      IN employees.last_name%TYPE DEFAULT NULL,
+                                      p_email          IN employees.email%TYPE DEFAULT NULL,
+                                      p_phone_number   IN employees.phone_number%TYPE DEFAULT NULL,
+                                      p_job_id         IN employees.job_id%TYPE DEFAULT NULL,
+                                      p_salary         IN employees.salary%TYPE   DEFAULT NULL,
+                                      p_commission_pct IN employees.commission_pct%TYPE   DEFAULT NULL,
+                                      p_manager_id     IN employees.manager_id%TYPE   DEFAULT NULL,
+                                      p_department_id  IN employees.department_id%TYPE   DEFAULT NULL) IS
+                                          
+        v_sql     VARCHAR2(2000);
+        v_set_sql VARCHAR2(1000);
+    BEGIN
+      
+        log_utils.log_start('change_attribute_employee');
+
+        IF p_first_name     IS NULL AND p_last_name     IS NULL AND 
+           p_email          IS NULL AND p_phone_number  IS NULL AND 
+           p_job_id         IS NULL AND p_salary        IS NULL AND 
+           p_commission_pct IS NULL AND p_manager_id    IS NULL AND 
+           p_department_id  IS NULL 
+        THEN
+            -- Якщо все NULL, виводимо інфо і фінішуємо
+            DBMS_OUTPUT.PUT_LINE('Нічого оновлювати для співробітника ' || p_employee_id);
+            log_utils.log_finish('change_attribute_employee');
+            RETURN;
+        END IF;
+
+       
+          -- Для рядків додаємо одинарні лапки ''
+          IF p_first_name     IS NOT NULL THEN v_set_sql := v_set_sql || 'first_name = '''||p_first_name||''', ';     END IF;
+          IF p_last_name      IS NOT NULL THEN v_set_sql := v_set_sql || 'last_name = '''||p_last_name||''', ';       END IF;
+          IF p_email          IS NOT NULL THEN v_set_sql := v_set_sql || 'email = '''||p_email||''', ';             END IF;
+          IF p_phone_number   IS NOT NULL THEN v_set_sql := v_set_sql || 'phone_number = '''||p_phone_number||''', '; END IF;
+          IF p_job_id         IS NOT NULL THEN v_set_sql := v_set_sql || 'job_id = '''||p_job_id||''', ';           END IF;
+              
+          IF p_salary         IS NOT NULL THEN v_set_sql := v_set_sql || 'salary = '||p_salary||', ';           END IF;
+          IF p_commission_pct IS NOT NULL THEN v_set_sql := v_set_sql || 'commission_pct = '||p_commission_pct||', '; END IF;
+          IF p_manager_id     IS NOT NULL THEN v_set_sql := v_set_sql || 'manager_id = '||p_manager_id||', ';     END IF;
+          IF p_department_id  IS NOT NULL THEN v_set_sql := v_set_sql || 'department_id = '||p_department_id||', '; END IF;
+
+          v_set_sql := RTRIM(v_set_sql, ', ');
+
+          BEGIN
+            
+              v_sql := 'UPDATE employees SET ' || v_set_sql || ' WHERE employee_id = :id';
+              
+              EXECUTE IMMEDIATE v_sql USING p_employee_id;
+
+              DBMS_OUTPUT.PUT_LINE('У співробітника ' || p_employee_id || ' успішно оновлені атрибути');
+          EXCEPTION
+              WHEN OTHERS THEN
+                  -- логуємо помилку
+                  log_utils.log_error('change_attribute_employee', SQLERRM);
+                  RAISE;
+          END;
+
+        log_utils.log_finish('change_attribute_employee');
+
+    END change_attribute_employee;
     
     
 END util;
