@@ -29,6 +29,14 @@ CREATE OR REPLACE PACKAGE util AS
 
 ----------------------
     FUNCTION get_sum_price_sales(p_table IN VARCHAR2) RETURN NUMBER;
+    
+---------------------
+
+    -- PS-14
+    FUNCTION get_needed_curr(p_valcode IN VARCHAR2 DEFAULT 'USD',
+                           p_date IN DATE DEFAULT SYSDATE) 
+                           RETURN VARCHAR2;
+
 ---------------------
     PROCEDURE add_new_jobs( p_job_id    IN VARCHAR2,
                            p_job_title  IN VARCHAR2,
@@ -46,9 +54,8 @@ CREATE OR REPLACE PACKAGE util AS
 ------------------------
     PROCEDURE update_balance(p_employee_id IN NUMBER,
                          p_balance     IN NUMBER);
--------------------------        
-
-	-- PS-10         
+-------------------------                 
+    -- PS-10         
     PROCEDURE add_employee(
                         p_first_name     IN employees.first_name%TYPE,
                         p_last_name      IN employees.last_name%TYPE,
@@ -59,12 +66,11 @@ CREATE OR REPLACE PACKAGE util AS
                         p_salary         IN employees.salary%TYPE,
                         p_commission_pct IN employees.commission_pct%TYPE DEFAULT NULL,
                         p_manager_id     IN employees.manager_id%TYPE DEFAULT 100,
-                        p_department_id  IN employees.department_id%TYPE);        
+                        p_department_id  IN employees.department_id%TYPE);   
+                               
 -------------------------
-
-    -- PS-11  
+     -- PS-11 
     PROCEDURE fire_an_employee(p_employee_id IN employees.employee_id%TYPE);
-
 -------------------------
      -- PS-12
     PROCEDURE change_attribute_employee(p_employee_id    IN employees.employee_id%TYPE,
@@ -78,7 +84,6 @@ CREATE OR REPLACE PACKAGE util AS
                                       p_manager_id     IN employees.manager_id%TYPE   DEFAULT NULL,
                                       p_department_id  IN employees.department_id%TYPE   DEFAULT NULL
                                   );
-
 -------------------------
      -- PS-13
      
@@ -88,8 +93,14 @@ CREATE OR REPLACE PACKAGE util AS
                         p_copy_data     IN BOOLEAN  DEFAULT FALSE,
                         po_result       OUT VARCHAR2
                     );
+------------------------
+     -- PS-14
+     
+     PROCEDURE api_nbu_sync;
+     
+     
+ END util;              
 
- END util;  
 
 
 
@@ -184,6 +195,21 @@ END table_from_list;
         RETURN v_price_sum;
     
     END get_sum_price_sales;
+    
+ ---------------------------------------
+    -- PS - 14
+   FUNCTION get_needed_curr(p_valcode IN VARCHAR2 DEFAULT 'USD',
+                           p_date IN DATE DEFAULT SYSDATE) 
+                           RETURN VARCHAR2 IS
+        v_json VARCHAR2(1000);
+        v_date VARCHAR2(15) := TO_CHAR(p_date, 'YYYYMMDD');
+        
+      BEGIN
+        SELECT sys.get_nbu(p_url => 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode='||p_valcode||'&date='||v_date||'&json') AS res
+        INTO v_json
+        FROM dual;
+        RETURN v_json;
+      END get_needed_curr;
 
   --------------------------------------------------------------------
     PROCEDURE check_work_time IS
@@ -322,7 +348,7 @@ END table_from_list;
     
     
  ------------------------------------
-	---- PS - 10
+    ---- PS - 10
     PROCEDURE add_employee(p_first_name     IN employees.first_name%TYPE,
                         p_last_name      IN employees.last_name%TYPE,
                         p_email          IN employees.email%TYPE,
@@ -391,9 +417,7 @@ END table_from_list;
     
     
 -------------------------
-    
-    PS - 11
-    
+
     PROCEDURE fire_an_employee(p_employee_id IN employees.employee_id%TYPE) IS
         v_first_name    VARCHAR2(50);
         v_last_name     VARCHAR2(50);
@@ -503,7 +527,6 @@ END table_from_list;
 
     END change_attribute_employee;
     
-    
 --------------------
     -- PS - 13
     
@@ -568,7 +591,51 @@ END table_from_list;
           WHEN OTHERS THEN
               LOG_UTILS.log_error('copy_table', 'Глобальна помилка: ' || SQLERRM);
               RAISE;
-    END copy_table;    
+    END copy_table;
+    
+------------------------
+     -- PS-14
+     
+     PROCEDURE api_nbu_sync IS
+          v_list_currencies VARCHAR2(2000);
+          v_json            VARCHAR2(1000);
+      BEGIN
+          BEGIN
+              SELECT value_text 
+              INTO v_list_currencies
+              FROM sys_params
+              WHERE param_name = 'list_currencies';
+          EXCEPTION
+              WHEN OTHERS THEN
+                  log_utils.log_error('api_nbu_sync', 'Помилка при отриманні списку валют: ' || SQLERRM);
+                  RAISE_APPLICATION_ERROR(-20001, 'Помилка при отриманні списку валют');
+          END;
+
+          FOR cc IN (SELECT value_list AS curr FROM TABLE(UTIL.table_from_list(p_list_val => v_list_currencies))) LOOP
+              BEGIN
+                  -- Отримуємо JSON через твою функцію
+                  v_json := UTIL.get_needed_curr(p_valcode => cc.curr);
+
+                  -- Парсимо JSON та вставляємо в cur_exchange
+                  INSERT INTO cur_exchange (r030, txt, rate, cur, exchangedate)
+                  SELECT r030, txt, rate, cc.curr, TO_DATE(exchangedate, 'DD.MM.YYYY')
+                  FROM JSON_TABLE(v_json, '$[*]'
+                      COLUMNS (
+                          r030         NUMBER       PATH '$.r030',
+                          txt          VARCHAR2(100) PATH '$.txt',
+                          rate         NUMBER       PATH '$.rate',
+                          exchangedate VARCHAR2(20)  PATH '$.exchangedate'
+                      )
+                  );
+
+              EXCEPTION
+                  WHEN OTHERS THEN
+                      log_utils.log_error('api_nbu_sync', 'Помилка для валюти ' || cc.curr || ': ' || SQLERRM);
+              END;
+          END LOOP;
+
+          COMMIT;
+          log_utils.log_finish('api_nbu_sync', 'Синхронізація завершена');
+      END api_nbu_sync;
     
 END util;
-            
